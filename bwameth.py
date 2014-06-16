@@ -14,24 +14,27 @@ and both are streamed directly to the aligner without a temporary file.
 The output is a corrected, sorted, indexed BAM.
 """
 from __future__ import print_function
-import tempfile
-import sys
+
+import argparse
 import os
 import os.path as op
-import argparse
-from subprocess import check_call
-from operator import itemgetter
-from itertools import groupby, repeat, chain
 import re
+import sys
+import tempfile
+from itertools import groupby, repeat, chain
+from future_builtins import zip as izip
+from operator import itemgetter
+from subprocess import check_call
+
+from toolshed import nopen, reader, is_newer_b
+
+from _speedups import convert_fasta
 
 try:
-    from itertools import izip
     import string
     maketrans = string.maketrans
 except ImportError: # python3
-    izip = zip
     maketrans = str.maketrans
-from toolshed import nopen, reader, is_newer_b
 
 __version__ = "0.10"
 
@@ -59,12 +62,6 @@ def wrap(text, width=100): # much faster than textwrap
 def run(cmd):
     list(nopen("|%s" % cmd.lstrip("|")))
 
-def fasta_iter(fasta_name):
-    fh = nopen(fasta_name)
-    faiter = (x[1] for x in groupby(fh, lambda line: line[0] == ">"))
-    for header in faiter:
-        header = next(header)[1:].strip()
-        yield header, "".join(s.strip() for s in next(faiter)).upper()
 
 def convert_reads(fq1s, fq2s, out=sys.stdout):
 
@@ -106,41 +103,6 @@ def convert_reads(fq1s, fq2s, out=sys.stdout):
     if lt80 > 50:
         sys.stderr.write("WARNING: %i reads with length < 80\n" % lt80)
         sys.stderr.write("       : this program is designed for long reads\n")
-
-
-def convert_fasta(ref_fasta, just_name=False):
-    out_fa = ref_fasta + ".bwameth.c2t"
-    if just_name:
-        return out_fa
-    msg = "c2t in %s to %s" % (ref_fasta, out_fa)
-    if is_newer_b(ref_fasta, out_fa):
-        sys.stderr.write("already converted: %s\n" % msg)
-        return out_fa
-    sys.stderr.write("converting %s\n" % msg)
-    try:
-        fh = open(out_fa, "w")
-        for header, seq in fasta_iter(ref_fasta):
-            ########### Reverse ######################
-            fh.write(">r%s\n" % header)
-
-            #if non_cpg_only:
-            #    for ctx in "TAG": # use "ATC" for fwd
-            #        seq = seq.replace('G' + ctx, "A" + ctx)
-            #    for line in wrap(seq):
-            #        print >>fh, line
-            #else:
-            for line in wrap(seq.replace("G", "A")):
-                fh.write(line + '\n')
-
-            ########### Forward ######################
-            fh.write(">f%s\n" % header)
-            for line in wrap(seq.replace("C", "T")):
-                fh.write(line + '\n')
-        fh.close()
-    except:
-        fh.close(); os.unlink(out_fa)
-        raise
-    return out_fa
 
 
 def bwa_index(fa):

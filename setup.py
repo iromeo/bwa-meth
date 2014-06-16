@@ -1,7 +1,12 @@
 import ez_setup
 import sys
-ez_setup.use_setuptools()
+from Cython.Build import cythonize
 from setuptools import setup
+from setuptools.extension import Extension
+
+ez_setup.use_setuptools()
+
+ext_modules = [Extension("*", ["*.pyx"], extra_compile_args=["-O3"])]
 
 # from mpld3
 def get_version(path):
@@ -37,5 +42,6 @@ setup(name='bwameth',
       'Programming Language :: Python :: 2',
       'Programming Language :: Python :: 3'
       ],
-      scripts=['bwameth.py']
+      scripts=['bwameth.py'],
+      ext_modules=cythonize(ext_modules)
 )
