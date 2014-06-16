@@ -2,7 +2,6 @@ __all__ = ["convert_fasta"]
 
 import sys
 import os
-from itertools import groupby
 
 from toolshed import nopen, is_newer_b
 
