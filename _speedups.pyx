@@ -7,17 +7,27 @@ from itertools import groupby
 from toolshed import nopen, is_newer_b
 
 
-def wrap(text, width=100): # much faster than textwrap
-    for i in range(0, len(text), width):
-        yield text[i:i + width]
+def fasta_write(fh, bytes text, int width=100):
+    cdef int i
+    cdef int offset
+    for offset in range(0, len(text), width):
+        for i in range(width):
+            fh.write(text[i + offset])
+        fh.write(os.linesep)
 
 
-def fasta_iter(fasta_name):
-    fh = nopen(fasta_name)
-    faiter = (x[1] for x in groupby(fh, lambda line: line[0] == ">"))
-    for header in faiter:
-        header = next(header)[1:].strip()
-        yield header, "".join(s.strip() for s in next(faiter)).upper()
+def fasta_iterread(fh):
+    cdef bytes header = None
+    cdef list chunks = []
+    for line in fh:
+        if line[0] == ">":
+            if header is not None:
+                yield header, "".join(chunks).upper()
+                del chunks[:]
+
+            header = line.strip(" \t\r\n>")
+        else:
+            chunks.add(line)
 
 
 def convert_fasta(ref_fasta, just_name=False):
@@ -30,19 +40,18 @@ def convert_fasta(ref_fasta, just_name=False):
         sys.stderr.write("already converted: %s\n" % msg)
         return out_fasta
     sys.stderr.write("converting %s\n" % msg)
-    try:
-        fh = open(out_fasta, "w")
-        for header, seq in fasta_iter(ref_fasta):
-            ########### Reverse ######################
-            fh.write(">r%s\n" % header)
 
-            ########### Forward ######################
-            fh.write(">f%s\n" % header)
-            for line in wrap(seq.replace("C", "T")):
-                fh.write(line + '\n')
-        fh.close()
+    ih = nopen(ref_fasta, "rb")
+    oh = open(out_fasta, "wb")
+    try:
+        for header, seq in fasta_iterread(ih):
+            oh.write(">r%s\n" % header)  # Reverse
+            fasta_write(oh, seq.replace("G", "A"))
+            oh.write(">f%s\n" % header)  # Forward
+            fasta_write(oh, seq.replace("C", "T"))
     finally:
-        fh.close()
+        ih.close()
+        oh.close()
         os.unlink(out_fasta)
 
     return out_fasta
