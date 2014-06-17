@@ -85,6 +85,10 @@ cdef int _process_read(fh, out, int mate):
     return len(seq) < 80
 
 
+cdef int is_eof(fh):
+    return fh.tell() == os.fstat(fh.fileno()).st_size
+
+
 def convert_reads(list fq1s, list fq2s, out=sys.stdout):
     cdef long long lt80 = 0
     for fq1, fq2 in zip(fq1s.split(","), fq2s.split(",")):
@@ -92,12 +96,10 @@ def convert_reads(list fq1s, list fq2s, out=sys.stdout):
         fq1 = nopen(fq1)
         fq2 = nopen(fq2) if fq2 != "NA" else None
 
-        try:
+        while not is_eof(fq1):  # This is enough.
             lt80 += _process_read(fq1, out, 1)
             if fq2 is not None:
                 lt80 += _process_read(fq2, out, 2)
-        except StopIteration:
-            pass
 
     out.flush()
     out.close()
