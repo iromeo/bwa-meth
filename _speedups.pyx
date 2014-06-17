@@ -66,7 +66,7 @@ def convert_fasta(bytes ref_fasta, just_name=False):
 re_mate_tag = re.compile(r"(?:_R/)[12]")
 
 cdef int _process_read(fh, out, int mate):
-    cdef bytes name = fh.readline().split(maxsplit=2)[0]
+    cdef bytes name = fh.readline().split(None, 2)[0]
     name = re_mate_tag.sub("", name)
     cdef bytes seq = fh.readline().upper().rstrip()
     fh.readline()
