@@ -87,8 +87,11 @@ def _process_read(fh, out, int mate):
 
 def convert_reads(bytes fq1s, bytes fq2s, out=sys.stdout):
     cdef long long lt80 = 0
-    for fq1, fq2 in zip(fq1s.split(","), fq2s.split(",")):
-        sys.stderr.write("converting reads in %s,%s\n" % (fq1, fq2))
+    cdef list files = list(zip(fq1s.split(","), fq2s.split(",")))
+    for i, (fq1, fq2) in enumerate(files, 1):
+        msg = ("converting reads in {0},{1} ({2:02d} files left)"
+               .format(fq1, fq2, len(files) - i))
+        print(msg, file=sys.stderr)
         fq1 = nopen(fq1)
         fq2 = nopen(fq2) if fq2 != "NA" else None
 

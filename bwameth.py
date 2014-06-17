@@ -38,26 +38,30 @@ except ImportError: # python3
 
 __version__ = "0.10"
 
-def checkX(cmd):
+
+def check_installed(cmd):
     for p in os.environ['PATH'].split(":"):
         if os.access(os.path.join(p, cmd), os.X_OK):
             break
     else:
-        raise Exception("executable for '%s' not found" % cmd)
+        raise RuntimeError("executable for {0!r} not found".format(cmd))
 
-checkX('samtools')
-checkX('bwa')
+
+check_installed('samtools')
+check_installed('bwa')
 
 class BWAMethException(Exception): pass
 
 def comp(s, _comp=maketrans('ATCG', 'TAGC')):
     return s.translate(_comp)
 
+
 def wrap(text, width=100): # much faster than textwrap
     try: xrange
     except NameError: xrange = range
     for s in xrange(0, len(text), width):
         yield text[s:s+width]
+
 
 def run(cmd):
     list(nopen("|%s" % cmd.lstrip("|")))
@@ -73,6 +77,7 @@ def bwa_index(fa):
         if op.exists(fa + ".amb"):
             os.unlink(fa + ".amb")
         raise
+
 
 class Bam(object):
     __slots__ = 'read flag chrom pos mapq cigar chrom_mate pos_mate tlen \
