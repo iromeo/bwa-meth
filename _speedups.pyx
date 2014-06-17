@@ -66,11 +66,11 @@ def convert_fasta(bytes ref_fasta, just_name=False):
 re_mate_tag = re.compile(r"(?:_R/)[12]")
 
 cdef int _process_read(fh, out, int mate):
-    cdef bytes name = fh.readline().split(None, 2)[0]
+    cdef bytes name = next(fh).split(None, 2)[0]
     name = re_mate_tag.sub("", name)
-    cdef bytes seq = fh.readline().upper().rstrip()
-    fh.readline()
-    cdef bytes qual = fh.readline()
+    cdef bytes seq = next(fh).upper().rstrip()
+    _ = next(fh)  # Skip.
+    cdef bytes qual = next(fh)
 
     cdef bytes a
     cdef bytes b
@@ -85,10 +85,6 @@ cdef int _process_read(fh, out, int mate):
     return len(seq) < 80
 
 
-cdef int is_eof(fh):
-    return fh.tell() == os.fstat(fh.fileno()).st_size
-
-
 def convert_reads(bytes fq1s, bytes fq2s, out=sys.stdout):
     cdef long long lt80 = 0
     for fq1, fq2 in zip(fq1s.split(","), fq2s.split(",")):
@@ -96,10 +92,12 @@ def convert_reads(bytes fq1s, bytes fq2s, out=sys.stdout):
         fq1 = nopen(fq1)
         fq2 = nopen(fq2) if fq2 != "NA" else None
 
-        while not is_eof(fq1):  # This is enough.
+        try:
             lt80 += _process_read(fq1, out, 1)
             if fq2 is not None:
                 lt80 += _process_read(fq2, out, 2)
+        except StopIteration:
+            pass
 
     out.flush()
     out.close()
