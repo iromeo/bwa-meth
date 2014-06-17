@@ -89,7 +89,7 @@ cdef int is_eof(fh):
     return fh.tell() == os.fstat(fh.fileno()).st_size
 
 
-def convert_reads(list fq1s, list fq2s, out=sys.stdout):
+def convert_reads(bytes fq1s, bytes fq2s, out=sys.stdout):
     cdef long long lt80 = 0
     for fq1, fq2 in zip(fq1s.split(","), fq2s.split(",")):
         sys.stderr.write("converting reads in %s,%s\n" % (fq1, fq2))
