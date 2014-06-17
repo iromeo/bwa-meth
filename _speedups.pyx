@@ -72,12 +72,12 @@ cdef int _process_read(fh, out, int mate):
     fh.readline()
     cdef bytes qual = fh.readline()
 
-    cdef char a
-    cdef char b
+    cdef bytes a
+    cdef bytes b
     if mate == 1:
-        a, b = "C", "T"
+        a, b = b"C", b"T"
     else:
-        a, b = "G", "A"
+        a, b = b"G", b"A"
 
     out.write(os.linesep.join((name + " YS:Z:" + seq + "\tYC:Z:" + a + b,
                                seq.replace(a, b),
