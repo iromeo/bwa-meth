@@ -65,7 +65,7 @@ def convert_fasta(bytes ref_fasta, just_name=False):
 
 re_mate_tag = re.compile(r"(?:_R/)[12]")
 
-cdef int _process_read(fh, out, int mate):
+def _process_read(fh, out, int mate):
     cdef bytes name = next(fh).split(None, 2)[0]
     name = re_mate_tag.sub("", name)
     cdef bytes seq = next(fh).upper().rstrip()
@@ -97,7 +97,7 @@ def convert_reads(bytes fq1s, bytes fq2s, out=sys.stdout):
                 lt80 += _process_read(fq1, out, 1)
                 if fq2 is not None:
                     lt80 += _process_read(fq2, out, 2)
-        except StopIteration:
+        except (StopIteration, IOError):
             pass
 
     out.flush()
