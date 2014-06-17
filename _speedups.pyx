@@ -93,14 +93,17 @@ def convert_reads(bytes fq1s, bytes fq2s, out=sys.stdout):
         fq2 = nopen(fq2) if fq2 != "NA" else None
 
         try:
-            lt80 += _process_read(fq1, out, 1)
-            if fq2 is not None:
-                lt80 += _process_read(fq2, out, 2)
+            while True:
+                lt80 += _process_read(fq1, out, 1)
+                if fq2 is not None:
+                    lt80 += _process_read(fq2, out, 2)
         except StopIteration:
             pass
 
     out.flush()
     out.close()
     if lt80 > 50:
-        sys.stderr.write("WARNING: %i reads with length < 80\n" % lt80)
-        sys.stderr.write("       : this program is designed for long reads\n")
+        print("WARNING: {0} reads with length < 80".format(lt80),
+              file=sys.stderr)
+        print("       : this program is designed for long reads",
+              file=sys.stderr)
