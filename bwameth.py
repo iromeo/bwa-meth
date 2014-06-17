@@ -28,7 +28,7 @@ from subprocess import check_call
 
 from toolshed import nopen, reader, is_newer_b
 
-from _speedups import convert_fasta
+from _speedups import convert_fasta, convert_reads
 
 try:
     import string
@@ -61,48 +61,6 @@ def wrap(text, width=100): # much faster than textwrap
 
 def run(cmd):
     list(nopen("|%s" % cmd.lstrip("|")))
-
-
-def convert_reads(fq1s, fq2s, out=sys.stdout):
-
-    for fq1, fq2 in zip(fq1s.split(","), fq2s.split(",")):
-        sys.stderr.write("converting reads in %s,%s\n" % (fq1, fq2))
-        fq1 = nopen(fq1)
-        if fq2 != "NA":
-            fq2 = nopen(fq2)
-            q2_iter = izip(*[fq2] * 4)
-        else:
-            sys.stderr.write("WARNING: running bwameth in single-end mode\n")
-            q2_iter = repeat((None, None, None, None))
-        q1_iter = izip(*[fq1] * 4)
-
-        lt80 = 0
-        for pair in izip(q1_iter, q2_iter):
-            for read_i, (name, seq, _, qual) in enumerate(pair):
-                if name is None: continue
-                name = name.rstrip("\r\n").split(" ")[0]
-                if name.endswith(("_R1", "_R2")):
-                    name = name[:-3]
-                elif name.endswith(("/1", "/2")):
-                    name = name[:-2]
-
-                seq = seq.upper().rstrip('\n')
-                if len(seq) < 80:
-                    lt80 += 1
-
-                char_a, char_b = ['CT', 'GA'][read_i]
-                # keep original sequence as name.
-                name = " ".join((name,
-                                "YS:Z:" + seq +
-                                "\tYC:Z:" + char_a + char_b + '\n'))
-                seq = seq.replace(char_a, char_b)
-                out.write("".join((name, seq, "\n+\n", qual)))
-
-    out.flush()
-    out.close()
-    if lt80 > 50:
-        sys.stderr.write("WARNING: %i reads with length < 80\n" % lt80)
-        sys.stderr.write("       : this program is designed for long reads\n")
 
 
 def bwa_index(fa):

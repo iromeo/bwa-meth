@@ -1,7 +1,12 @@
-__all__ = ["convert_fasta"]
+from __future__ import print_function
 
+__all__ = ["convert_fasta", "convert_reads"]
+
+import re
 import sys
 import os
+from itertools import repeat
+from future_builtins import zip
 
 from toolshed import nopen, is_newer_b
 
@@ -56,3 +61,46 @@ def convert_fasta(bytes ref_fasta, just_name=False):
         os.unlink(out_fasta)
 
     return out_fasta
+
+
+re_mate_tag = re.compile(r"(?:_R/)[12]")
+
+cdef int _process_read(fh, out, int mate):
+    cdef bytes name = fh.readline().split(maxsplit=2)[0]
+    name = re_mate_tag.sub("", name)
+    cdef bytes seq = fh.readline().upper().rstrip()
+    fh.readline()
+    cdef bytes qual = fh.readline()
+
+    cdef char a
+    cdef char b
+    if mate == 1:
+        a, b = "C", "T"
+    else:
+        a, b = "G", "A"
+
+    out.write(os.linesep.join((name + " YS:Z:" + seq + "\tYC:Z:" + a + b,
+                               seq.replace(a, b),
+                               "+", qual)))
+    return len(seq) < 80
+
+
+def convert_reads(list fq1s, list fq2s, out=sys.stdout):
+    cdef long long lt80 = 0
+    for fq1, fq2 in zip(fq1s.split(","), fq2s.split(",")):
+        sys.stderr.write("converting reads in %s,%s\n" % (fq1, fq2))
+        fq1 = nopen(fq1)
+        fq2 = nopen(fq2) if fq2 != "NA" else None
+
+        try:
+            lt80 += _process_read(fq1, out, 1)
+            if fq2 is not None:
+                lt80 += _process_read(fq2, out, 2)
+        except StopIteration:
+            pass
+
+    out.flush()
+    out.close()
+    if lt80 > 50:
+        sys.stderr.write("WARNING: %i reads with length < 80\n" % lt80)
+        sys.stderr.write("       : this program is designed for long reads\n")
