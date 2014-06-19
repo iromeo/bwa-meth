@@ -35,7 +35,7 @@ def fasta_iterread(fh):
 
             header = line.strip(" \t\r\n>")
         else:
-            chunks.add(line)
+            chunks.append(line)
 
 
 def convert_fasta(bytes ref_fasta, just_name=False):
