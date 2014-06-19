@@ -19,7 +19,7 @@ def fasta_write(fh, bytes header, bytes seq, int width=100):
     fh.write(header)
     fh.write(os.linesep)
     for offset in range(0, len(seq), width):
-        for i in range(width):
+        for i in range(min(len(seq) - offset, width)):
             fh.write(seq[i + offset])
         fh.write(os.linesep)
 
