@@ -55,10 +55,12 @@ def convert_fasta(bytes ref_fasta, just_name=False):
         for header, seq in fasta_iterread(ih):
             fasta_write(oh, "r" + header, seq.replace("G", "A"))  # Reverse.
             fasta_write(oh, "f" + header, seq.replace("C", "T"))  # Forward.
+    except Exception:
+        os.unlink(out_fasta)
+        raise
     finally:
         ih.close()
         oh.close()
-        os.unlink(out_fasta)
 
     return out_fasta
 
