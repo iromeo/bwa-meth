@@ -66,8 +66,8 @@ def fasta_iter(fasta_name):
         header = next(header)[1:].strip()
         yield header, "".join(s.strip() for s in next(faiter)).upper()
 
-def convert_reads(fq1s, fq2s, out=sys.stdout):
 
+def convert_reads(fq1s, fq2s, out=sys.stdout):
     for fq1, fq2 in zip(fq1s.split(","), fq2s.split(",")):
         sys.stderr.write("converting reads in %s,%s\n" % (fq1, fq2))
         fq1 = nopen(fq1)
@@ -80,26 +80,27 @@ def convert_reads(fq1s, fq2s, out=sys.stdout):
         q1_iter = izip(*[fq1] * 4)
 
         lt80 = 0
+        char_ab = "CT", "GA"
         for pair in izip(q1_iter, q2_iter):
             for read_i, (name, seq, _, qual) in enumerate(pair):
-                if name is None: continue
-                name = name.rstrip("\r\n").split(" ")[0]
+                if name is None:
+                    continue
+
+                # XXX why can't we just strip all whitespace?
+                name = name.split(" ", 1)[0].rstrip("\r\n")
                 if name.endswith(("_R1", "_R2")):
                     name = name[:-3]
                 elif name.endswith(("/1", "/2")):
                     name = name[:-2]
 
-                seq = seq.upper().rstrip('\n')
-                if len(seq) < 80:
-                    lt80 += 1
+                seq = seq.upper().rstrip("\n")
+                lt80 += len(seq) < 80
 
-                char_a, char_b = ['CT', 'GA'][read_i]
                 # keep original sequence as name.
-                name = " ".join((name,
-                                "YS:Z:" + seq +
-                                "\tYC:Z:" + char_a + char_b + '\n'))
-                seq = seq.replace(char_a, char_b)
-                out.write("".join((name, seq, "\n+\n", qual)))
+                name = ("{0} YS:Z:{1}\tYC:Z:{2}"
+                        .format(name, seq, char_ab[read_i]))
+                seq = seq.replace(*char_ab[read_i])
+                out.write("\n".join((name, seq, "+", qual)))
 
     out.flush()
     out.close()
