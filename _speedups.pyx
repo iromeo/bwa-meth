@@ -1,4 +1,5 @@
 import re
+from future_builtins import zip
 
 
 class Bam(object):
@@ -6,8 +7,8 @@ class Bam(object):
             seq qual other'.split()
 
     def __init__(self, args):
-        for a, v in zip(self.__slots__[:11], args):
-            setattr(self, a, v)
+        for attr, value in zip(self.__slots__[:11], args):
+            setattr(self, attr, value)
         self.other = args[11:]
         self.flag = int(self.flag)
         self.pos = int(self.pos)
@@ -81,11 +82,12 @@ class Bam(object):
 
     @property
     def original_seq(self):
-        return next(x for x in self.other if x.startswith("YS:Z:"))[5:]
+        cdef str tag
+        for tag in self.other:
+            if tag.startswith("YS:Z"):
+                return tag[5:]
 
-    @property
-    def ga_ct(self):
-        return [x for x in self.other if x.startswith("YC:Z:")]
+        # XXX we must always find it.
 
     def longest_match(self, patt=re.compile("(\d+)M")):
         return max(int(match.group(1))
