@@ -14,15 +14,15 @@ and both are streamed directly to the aligner without a temporary file.
 The output is a corrected, sorted, indexed BAM.
 """
 from __future__ import print_function
-import tempfile
-import sys
+
+import argparse
 import os
 import os.path as op
-import argparse
-from subprocess import check_call
-from operator import itemgetter
+import sys
+import tempfile
 from itertools import groupby, repeat, chain
-import re
+from operator import itemgetter
+from subprocess import check_call
 
 try:
     from itertools import izip
@@ -31,7 +31,15 @@ try:
 except ImportError: # python3
     izip = zip
     maketrans = str.maketrans
+
 from toolshed import nopen, reader, is_newer_b
+
+try:
+    from _speedups import Bam
+except ImportError:
+    print("WARNING: using pure Python BAM parser", file=sys.stderr)
+    from _fallback import Bam
+
 
 __version__ = "0.10"
 
@@ -159,80 +167,6 @@ def bwa_index(fa):
             os.unlink(fa + ".amb")
         raise
 
-class Bam(object):
-    __slots__ = 'read flag chrom pos mapq cigar chrom_mate pos_mate tlen \
-            seq qual other'.split()
-    def __init__(self, args):
-        for a, v in zip(self.__slots__[:11], args):
-            setattr(self, a, v)
-        self.other = args[11:]
-        self.flag = int(self.flag)
-        self.pos = int(self.pos)
-        self.tlen = int(float(self.tlen))
-
-    def __repr__(self):
-        return "Bam({chr}:{start}:{read}".format(chr=self.chrom,
-                                                 start=self.pos,
-                                                 read=self.read)
-
-    def __str__(self):
-        return "\t".join(str(getattr(self, s)) for s in self.__slots__[:11]) \
-                         + "\t" + "\t".join(self.other)
-
-    def is_first_read(self):
-        return bool(self.flag & 0x40)
-
-    def is_second_read(self):
-        return bool(self.flag & 0x80)
-
-    def is_plus_read(self):
-        return not (self.flag & 0x10)
-
-    def is_minus_read(self):
-        return bool(self.flag & 0x10)
-
-    def is_mapped(self):
-        return not (self.flag & 0x4)
-
-    def cigs(self):
-        if self.cigar == "*":
-            yield (0, None)
-            raise StopIteration
-        cig_iter = groupby(self.cigar, lambda c: c.isdigit())
-        for g, n in cig_iter:
-            yield int("".join(n)), "".join(next(cig_iter)[1])
-
-    def cig_len(self):
-        return sum(c[0] for c in self.cigs() if c[1] in
-                   ("M", "D", "N", "EQ", "X", "P"))
-
-    def left_shift(self):
-        left = 0
-        for n, cig in self.cigs():
-            if cig == "M": break
-            if cig == "H":
-                left += n
-        return left
-
-    def right_shift(self):
-        right = 0
-        for n, cig in reversed(list(self.cigs())):
-            if cig == "M": break
-            if cig == "H":
-                right += n
-        return -right or None
-
-    @property
-    def original_seq(self):
-        return next(x for x in self.other if x.startswith("YS:Z:"))[5:]
-
-    @property
-    def ga_ct(self):
-        return [x for x in self.other if x.startswith("YC:Z:")]
-
-    def longest_match(self, patt=re.compile("\d+M")):
-        return max(int(x[:-1]) for x in patt.findall(self.cigar))
-
 
 def rname(fq1, fq2=""):
     fq1, fq2 = fq1.split(",")[0], fq2.split(",")[0]
@@ -289,7 +223,7 @@ def as_bam(pfile, fa, prefix, calmd=False, set_as_failed=None):
     p = nopen("|" + cmds[0], 'w')
     out = p.stdin
     #out = sys.stdout # useful for debugging
-    bam_iter = reader("%s" % (pfile,), header=False, quotechar=None)
+    bam_iter = reader(str(pfile), header=False, quotechar=None)
     for toks in bam_iter:
         if not toks[0].startswith("@"): break
         handle_header(toks, out)
@@ -311,6 +245,7 @@ def as_bam(pfile, fa, prefix, calmd=False, set_as_failed=None):
         sys.stderr.write("running: %s\n" % cmd.strip())
         assert check_call(cmd.strip(), shell=True) == 0
 
+
 def handle_header(toks, out):
     if toks[0].startswith("@SQ"):
         sq, sn, ln = toks  # @SQ    SN:fchr11    LN:122082543
@@ -328,7 +263,6 @@ def handle_header(toks, out):
 
 
 def handle_reads(alns, set_as_failed):
-
     for aln in alns:
         orig_seq = aln.original_seq
         assert len(aln.seq) == len(aln.qual), aln.read
@@ -364,7 +298,7 @@ def handle_reads(alns, set_as_failed):
             aln.chrom_mate = aln.chrom_mate[1:]
 
         # adjust the original seq to the cigar
-        l, r = aln.left_shift(), aln.right_shift()
+        l, r = aln.left_right_shift()
         if aln.is_plus_read():
             aln.seq = orig_seq[l:r]
         else:

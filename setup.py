@@ -1,7 +1,7 @@
 import ez_setup
 import sys
 ez_setup.use_setuptools()
-from setuptools import setup
+from setuptools import setup, Extension
 
 # from mpld3
 def get_version(path):
@@ -27,6 +27,7 @@ setup(name='bwameth',
       version=get_version("bwameth.py"),
       description="align BS-Seq reads with bwa mem",
       py_modules=['bwameth'],
+      ext_modules=[Extension("_speedups", sources=["_speedups.c"])],
       author="Brent Pedersen",
       author_email="bpederse@gmail.com",
       license="MIT",
