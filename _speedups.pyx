@@ -1,5 +1,9 @@
 import re
-from future_builtins import zip
+
+try:
+    from future_builtins import zip
+except ImportError: # python3
+    from builtins import zip
 
 
 class Bam(object):
